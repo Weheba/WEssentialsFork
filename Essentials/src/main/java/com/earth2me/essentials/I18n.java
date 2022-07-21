@@ -1,6 +1,7 @@
 package com.earth2me.essentials;
 
 import net.ess3.api.IEssentials;
+import net.md_5.bungee.api.ChatColor;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -21,6 +22,7 @@ import java.util.MissingResourceException;
 import java.util.PropertyResourceBundle;
 import java.util.ResourceBundle;
 import java.util.logging.Level;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class I18n implements net.ess3.api.II18n {
@@ -55,11 +57,14 @@ public class I18n implements net.ess3.api.II18n {
         if (instance == null) {
             return "";
         }
+        final String str;
         if (objects.length == 0) {
-            return NODOUBLEMARK.matcher(instance.translate(string)).replaceAll("'");
+            str = NODOUBLEMARK.matcher(instance.translate(string)).replaceAll("'");
         } else {
-            return instance.format(string, objects);
+            str = instance.format(string, objects);
         }
+
+        return instance.formatHexCodes(str);
     }
 
     public static String capitalCase(final String input) {
@@ -80,18 +85,41 @@ public class I18n implements net.ess3.api.II18n {
     }
 
     private String translate(final String string) {
+        String str;
         try {
             try {
-                return customBundle.getString(string);
+                str = customBundle.getString(string);
             } catch (final MissingResourceException ex) {
-                return localeBundle.getString(string);
+                str = localeBundle.getString(string);
             }
         } catch (final MissingResourceException ex) {
             if (ess == null || ess.getSettings().isDebug()) {
                 ess.getLogger().log(Level.WARNING, String.format("Missing translation key \"%s\" in translation file %s", ex.getKey(), localeBundle.getLocale().toString()), ex);
             }
-            return defaultBundle.getString(string);
+            str = defaultBundle.getString(string);
         }
+
+        return str;
+    }
+
+    private String formatHexCodes(String message) {
+        message = message.replace("&#", "#");
+        final Pattern pattern = Pattern.compile("#[a-fA-F0-9]{6}");
+        Matcher matcher = pattern.matcher(message);
+        while (matcher.find()) {
+            final String hexCode = message.substring(matcher.start(), matcher.end());
+            final String replaceSharp = hexCode.replace('#', 'x');
+
+            final char[] ch = replaceSharp.toCharArray();
+            final StringBuilder builder = new StringBuilder("");
+            for (char c : ch) {
+                builder.append("&" + c);
+            }
+
+            message = message.replace(hexCode, builder.toString());
+            matcher = pattern.matcher(message);
+        }
+        return ChatColor.translateAlternateColorCodes('&', message);
     }
 
     public String format(final String string, final Object... objects) {
